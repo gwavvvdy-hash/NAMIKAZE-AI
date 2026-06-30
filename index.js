@@ -1,11 +1,13 @@
-const express = require('express');
-const app = express();
-const port = process.env.PORT || 3000;
+const { Telegraf } = require('telegraf');
 
-app.get('/', (req, res) => {
-  res.send('السيرفر يعمل الآن بنجاح!');
+// استدعاء التوكن من متغيرات البيئة التي ستضعها في Railway
+const bot = new Telegraf(process.env.TELEGRAM_TOKEN);
+
+bot.start((ctx) => ctx.reply('أهلاً بك! أنا NAMIKAZE-AI، كيف أساعدك اليوم؟'));
+bot.on('text', (ctx) => {
+    ctx.reply('لقد استلمت رسالتك: ' + ctx.message.text);
 });
 
-app.listen(port, () => {
-  console.log(`السيرفر يعمل على المنفذ ${port}`);
+bot.launch().then(() => {
+    console.log('البوت يعمل الآن!');
 });
