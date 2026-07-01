@@ -1,3 +1,5 @@
+require("dotenv").config();
+
 const { Telegraf } = require("telegraf");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const axios = require("axios");
@@ -21,14 +23,15 @@ bot.on("text", async (ctx) => {
         }
 
         await ctx.sendChatAction("upload_photo");
+
         const waitMsg = await ctx.reply("🎨 جاري إنشاء الصورة...");
 
         try {
 
-            const { data } = await axios.post(
+            const generate = await axios.post(
                 "https://aihorde.net/api/v2/generate/async",
                 {
-                    prompt: `${prompt}, masterpiece, best quality, ultra detailed, photorealistic, perfect anatomy`,
+                    prompt: `${prompt}, masterpiece, best quality, ultra detailed, photorealistic, cinematic lighting, sharp focus, perfect anatomy, realistic face, realistic eyes, 8k`,
                     params: {
                         width: 1024,
                         height: 1024,
@@ -41,63 +44,56 @@ bot.on("text", async (ctx) => {
                 },
                 {
                     headers: {
-                        "Client-Agent": "NAMIKAZE AI",
-                        "Content-Type": "application/json"
+                        "Content-Type": "application/json",
+                        "apikey": process.env.AI_HORDE_API_KEY,
+                        "Client-Agent": "NAMIKAZE AI"
                     }
                 }
             );
 
-            const id = data.id;
+            const id = generate.data.id;
 
             while (true) {
 
                 await new Promise(resolve => setTimeout(resolve, 3000));
 
                 const status = await axios.get(
-                    `https://aihorde.net/api/v2/generate/check/${id}`
+                    `https://aihorde.net/api/v2/generate/status/${id}`,
+                    {
+                        headers: {
+                            "apikey": process.env.AI_HORDE_API_KEY,
+                            "Client-Agent": "NAMIKAZE AI"
+                        }
+                    }
                 );
 
-                if (!status.data.done) {
-                    continue;
+                if (!status.data.done) continue;
+
+                if (!status.data.generations || status.data.generations.length === 0) {
+                    throw new Error("No image generated");
                 }
 
-                const result = await axios.get(
-                    `https://aihorde.net/api/v2/generate/status/${id}`
+                const imageUrl = status.data.generations[0].img;
+
+                await ctx.deleteMessage(waitMsg.message_id);
+
+                return ctx.replyWithPhoto(
+                    { url: imageUrl },
+                    {
+                        caption: `🖼️ ${prompt}`
+                    }
                 );
-
-                if (
-                    result.data.generations &&
-                    result.data.generations.length > 0
-                ) {
-
-                    await ctx.deleteMessage(waitMsg.message_id);
-
-                    return ctx.replyWithPhoto({
-                        url: result.data.generations[0].img
-                    });
-                }
-
-                throw new Error("لم يتم إنشاء الصورة.");
             }
 
         } catch (error) {
-
-            console.error(
-                error.response?.data ||
-                error.message ||
-                error
-            );
-
-            await ctx.reply("❌ فشل إنشاء الصورة.");
-
-            return;
+            console.error(error.response?.data || error.message);
+            return ctx.reply("❌ فشل إنشاء الصورة.");
         }
     }
 
     // ===========================
     // Gemini Chat
     // ===========================
-
     try {
 
         await ctx.sendChatAction("typing");
@@ -114,14 +110,12 @@ bot.on("text", async (ctx) => {
 
         console.error(error);
 
-        await ctx.reply("❌ حدث خطأ أثناء معالجة طلبك.");
+        await ctx.reply("❌ حدث خطأ أثناء معالجة طلبك، حاول مرة أخرى.");
 
     }
-
 });
 
 bot.launch();
-
 console.log("🤖 NAMIKAZE AI Started");
 
 process.once("SIGINT", () => bot.stop("SIGINT"));
