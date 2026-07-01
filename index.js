@@ -31,14 +31,14 @@ bot.on("text", async (ctx) => {
                 "https://aihorde.net/api/v2/generate/async",
                 {
                     prompt: `${prompt}, masterpiece, best quality, ultra detailed, cinematic lighting, sharp focus`,
-                    params: {
-                        width: 1024,
-                        height: 1024,
-                        steps: 30,
-                        cfg_scale: 7,
-                        sampler_name: "k_euler",
-                        n: 1
-                    },
+                  params: {
+  width: 512,
+  height: 512,
+  steps: 20,
+  cfg_scale: 7,
+  sampler_name: "k_euler",
+  n: 1
+}
                     nsfw: false
                 },
                 {
