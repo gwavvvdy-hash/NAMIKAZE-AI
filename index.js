@@ -2,8 +2,6 @@ const { Telegraf } = require('telegraf');
 const axios = require('axios');
 
 const bot = new Telegraf(process.env.TELEGRAM_TOKEN);
-
-// مصفوفة لحفظ أسماء المستخدمين (ذاكرة مؤقتة)
 const userMemory = {};
 
 bot.on('text', async (ctx) => {
@@ -11,39 +9,37 @@ bot.on('text', async (ctx) => {
     const userText = ctx.message.text;
     const lowerText = userText.toLowerCase();
 
-    // 1. قاعدة حفظ الاسم (مثال: "اسمي امير")
+    // 1. [جديد] ميزة صنع الصور
+    if (lowerText.startsWith('ارسم ') || lowerText.startsWith('صورة ')) {
+        const prompt = userText.split(' ').slice(1).join(' ');
+        if (!prompt) return ctx.reply('يرجى كتابة وصف للصورة بعد كلمة ارسم.');
+        
+        await ctx.sendChatAction('upload_photo');
+        // رابط توليد الصور المجاني والسريع
+        const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=1024&height=1024&seed=${Math.floor(Math.random() * 10000)}&nologo=true`;
+        return ctx.replyWithPhoto({ url: imageUrl }, { caption: `رسمت لك: ${prompt}` });
+    }
+
+    // 2. حفظ الاسم
     if (lowerText.startsWith('اسمي ')) {
         const name = userText.split(' ').slice(1).join(' ');
         userMemory[chatId] = name;
-        return ctx.reply(`تشرفت بك يا ${name}! لقد حفظت اسمك في ذاكرتي.`);
+        return ctx.reply(`تشرفت بك يا ${name}!`);
     }
 
-    // 2. قاعدة السؤال عن الاسم ("ما هو اسمي")
-    if (lowerText.includes('ما هو اسمي') || lowerText.includes('ما اسمي')) {
-        const name = userMemory[chatId];
-        return name ? ctx.reply(`اسمك هو ${name}`) : ctx.reply('لم تخبرني باسمك بعد! قل لي "اسمي [اسمك]" وسأحفظه.');
-    }
-
-    // 3. الرد المخصص لهوية البوت
-    if (lowerText.includes('من انت') || lowerText.includes('ما اسمك')) {
-        return ctx.reply('أنا هو NAMIKAZE AI وتم تطويري من قبل @Namikaze_YT لأكون مساعدك الشخصي على تيليجرام');
-    }
-
-    // 4. معالجة الذكاء الاصطناعي (مع إرسال الاسم المحفوظ له ليعرف مع من يتحدث)
+    // 3. المحادثة مع Gemini (استخدمت الرابط الصحيح 1.5)
     try {
         await ctx.sendChatAction('typing');
-        const context = userMemory[chatId] ? `المستخدم يتحدث معك واسمه: ${userMemory[chatId]}` : "المستخدم غير معروف";
-        
-        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`;
+        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`;
         
         const response = await axios.post(apiUrl, {
-            contents: [{ parts: [{ text: `${context}\nسؤال المستخدم: ${userText}` }] }]
+            contents: [{ parts: [{ text: userText }] }]
         });
 
         await ctx.reply(response.data.candidates[0].content.parts[0].text);
     } catch (error) {
-        ctx.reply('حدث خطأ تقني.');
+        ctx.reply('حدث خطأ تقني، تأكد من مفتاح Gemini.');
     }
 });
 
-bot.launch().then(() => console.log("NAMIKAZE AI يعمل الآن بذاكرة ذكية!"));
+bot.launch({ dropPendingUpdates: true }).then(() => console.log("NAMIKAZE AI يعمل الآن مع صانع الصور!"));
