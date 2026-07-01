@@ -29,7 +29,7 @@ bot.on("text", async (ctx) => {
             const generate = await axios.post(
                 "https://aihorde.net/api/v2/generate/async",
                 {
-                    prompt: `${prompt}, masterpiece, best quality, ultra detailed, photorealistic, cinematic lighting, sharp focus`,
+                    prompt: `${prompt}, masterpiece, best quality, ultra detailed, cinematic lighting`,
                     params: {
                         width: 1024,
                         height: 1024,
@@ -52,6 +52,7 @@ bot.on("text", async (ctx) => {
             const id = generate.data.id;
 
             while (true) {
+
                 await new Promise(resolve => setTimeout(resolve, 3000));
 
                 const status = await axios.get(
@@ -70,10 +71,12 @@ bot.on("text", async (ctx) => {
                     throw new Error("No image generated");
                 }
 
+                const imageUrl = status.data.generations[0].img;
+
                 await ctx.deleteMessage(waitMsg.message_id);
 
                 return ctx.replyWithPhoto(
-                    { url: status.data.generations[0].img },
+                    { url: imageUrl },
                     {
                         caption: `🖼️ ${prompt}`
                     }
@@ -87,7 +90,7 @@ bot.on("text", async (ctx) => {
     }
 
     // ===========================
-    // Gemini via OpenRouter
+    // DeepSeek Chat
     // ===========================
     try {
 
@@ -96,8 +99,13 @@ bot.on("text", async (ctx) => {
         const response = await axios.post(
             "https://openrouter.ai/api/v1/chat/completions",
             {
-                model: "google/gemini-2.5-flash",
+                model: "deepseek/deepseek-chat-v3-0324:free",
+                max_tokens: 1024,
                 messages: [
+                    {
+                        role: "system",
+                        content: "أنت Namikaze AI. تتحدث بالعربية واللهجة العراقية عند الحاجة، وتجيب بدقة وبأسلوب طبيعي."
+                    },
                     {
                         role: "user",
                         content: userText
