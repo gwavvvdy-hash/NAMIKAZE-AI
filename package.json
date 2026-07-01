@@ -7,6 +7,6 @@
   },
   "dependencies": {
     "telegraf": "4.16.3",
-    "@google/generative-ai": "0.19.0"
+    "axios": "1.7.0"
   }
 }
