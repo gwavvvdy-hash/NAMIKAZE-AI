@@ -91,8 +91,16 @@ bot.telegram.setMyCommands([
 ]);
 
 bot.command("reset", async (ctx) => {
-    startNewChat(ctx.from.id);
-    await ctx.reply("✅ تم بدء محادثة جديدة. يمكنك البدء من جديد.");
+    const userId = ctx.from.id;
+    
+    // 1. أرشفة المحادثة الحالية
+    startNewChat(userId);
+
+    // 2. دفع الرسائل للأعلى
+    const spacer = ".\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n";
+    const header = "✨ —————— [ محادثة جديدة ] —————— ✨\n\nتم حفظ المحادثة السابقة في /history، وبدء صفحة جديدة.";
+    
+    await ctx.reply(spacer + header);
 });
 
 bot.command("history", async (ctx) => {
