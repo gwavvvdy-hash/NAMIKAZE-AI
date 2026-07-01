@@ -29,7 +29,7 @@ bot.on("text", async (ctx) => {
             const generate = await axios.post(
                 "https://aihorde.net/api/v2/generate/async",
                 {
-                    prompt: `${prompt}, masterpiece, best quality, ultra detailed, cinematic lighting`,
+                    prompt: `${prompt}, masterpiece, best quality, ultra detailed, cinematic lighting, sharp focus`,
                     params: {
                         width: 1024,
                         height: 1024,
@@ -84,13 +84,17 @@ bot.on("text", async (ctx) => {
             }
 
         } catch (error) {
+
             console.error(error.response?.data || error.message);
+
             return ctx.reply("❌ فشل إنشاء الصورة.");
+
         }
+
     }
 
     // ===========================
-    // DeepSeek Chat
+    // Qwen Chat
     // ===========================
     try {
 
@@ -99,12 +103,15 @@ bot.on("text", async (ctx) => {
         const response = await axios.post(
             "https://openrouter.ai/api/v1/chat/completions",
             {
-                model: "deepseek/deepseek-chat-v3-0324:free",
+                model: "qwen/qwen3-32b:free",
                 max_tokens: 1024,
-                messages: [
+                temperature: 0.7,                messages: [
                     {
                         role: "system",
-                        content: "أنت Namikaze AI. تتحدث بالعربية واللهجة العراقية عند الحاجة، وتجيب بدقة وبأسلوب طبيعي."
+                        content: `أنت Namikaze AI.
+تتكلم بالعربية واللهجة العراقية عند الحاجة.
+كن ذكيًا، مختصرًا، ودقيقًا.
+لا تقل أنك ChatGPT أو OpenAI.`
                     },
                     {
                         role: "user",
@@ -115,7 +122,9 @@ bot.on("text", async (ctx) => {
             {
                 headers: {
                     "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
-                    "Content-Type": "application/json"
+                    "Content-Type": "application/json",
+                    "HTTP-Referer": "https://github.com/namikaze-ai",
+                    "X-Title": "NAMIKAZE AI"
                 }
             }
         );
@@ -123,9 +132,13 @@ bot.on("text", async (ctx) => {
         await ctx.reply(response.data.choices[0].message.content);
 
     } catch (error) {
+
         console.error(error.response?.data || error.message);
-        await ctx.reply("❌ حدث خطأ أثناء معالجة طلبك.");
+
+        await ctx.reply("❌ حدث خطأ أثناء معالجة الطلب.");
+
     }
+
 });
 
 bot.launch();
