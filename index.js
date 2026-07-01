@@ -1,13 +1,18 @@
 const { Telegraf } = require('telegraf');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 
-// استدعاء التوكن من متغيرات البيئة التي ستضعها في Railway
 const bot = new Telegraf(process.env.TELEGRAM_TOKEN);
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-bot.start((ctx) => ctx.reply('أهلاً بك! أنا NAMIKAZE-AI، كيف أساعدك اليوم؟'));
-bot.on('text', (ctx) => {
-    ctx.reply('لقد استلمت رسالتك: ' + ctx.message.text);
+bot.on('text', async (ctx) => {
+    try {
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const result = await model.generateContent(ctx.message.text);
+        const response = await result.response;
+        ctx.reply(response.text());
+    } catch (error) {
+        ctx.reply('عذراً، حدث خطأ أثناء الاتصال بـ Gemini.');
+    }
 });
 
-bot.launch().then(() => {
-    console.log('البوت يعمل الآن!');
-});
+bot.launch();
