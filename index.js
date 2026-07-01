@@ -21,15 +21,14 @@ bot.on("text", async (ctx) => {
         }
 
         await ctx.sendChatAction("upload_photo");
-
         const waitMsg = await ctx.reply("🎨 جاري إنشاء الصورة...");
 
         try {
 
-            const generate = await axios.post(
+            const { data } = await axios.post(
                 "https://aihorde.net/api/v2/generate/async",
                 {
-                    prompt: `${prompt}, masterpiece, best quality, ultra detailed, photorealistic, cinematic lighting, sharp focus, perfect anatomy, correct hands, realistic face, realistic eyes, 8k`,
+                    prompt: `${prompt}, masterpiece, best quality, ultra detailed, photorealistic, perfect anatomy`,
                     params: {
                         width: 1024,
                         height: 1024,
@@ -42,49 +41,63 @@ bot.on("text", async (ctx) => {
                 },
                 {
                     headers: {
-                        "Content-Type": "application/json",
-                        "Client-Agent": "NAMIKAZE AI"
+                        "Client-Agent": "NAMIKAZE AI",
+                        "Content-Type": "application/json"
                     }
                 }
             );
 
-            const id = generate.data.id;
+            const id = data.id;
 
             while (true) {
 
                 await new Promise(resolve => setTimeout(resolve, 3000));
 
                 const status = await axios.get(
+                    `https://aihorde.net/api/v2/generate/check/${id}`
+                );
+
+                if (!status.data.done) {
+                    continue;
+                }
+
+                const result = await axios.get(
                     `https://aihorde.net/api/v2/generate/status/${id}`
                 );
 
-                if (!status.data.done) continue;
+                if (
+                    result.data.generations &&
+                    result.data.generations.length > 0
+                ) {
 
-                if (!status.data.generations || status.data.generations.length === 0) {
-                    throw new Error("No image generated");
+                    await ctx.deleteMessage(waitMsg.message_id);
+
+                    return ctx.replyWithPhoto({
+                        url: result.data.generations[0].img
+                    });
                 }
 
-                const imageUrl = status.data.generations[0].img;
-
-                await ctx.deleteMessage(waitMsg.message_id);
-
-                return ctx.replyWithPhoto(
-                    { url: imageUrl },
-                    {
-                        caption: `🖼️ ${prompt}`
-                    }
-                );
+                throw new Error("لم يتم إنشاء الصورة.");
             }
 
         } catch (error) {
-            console.error(error);
-            return ctx.reply("❌ فشل إنشاء الصورة.");
+
+            console.error(
+                error.response?.data ||
+                error.message ||
+                error
+            );
+
+            await ctx.reply("❌ فشل إنشاء الصورة.");
+
+            return;
         }
     }
 
     // ===========================
     // Gemini Chat
     // ===========================
+
     try {
 
         await ctx.sendChatAction("typing");
@@ -101,12 +114,14 @@ bot.on("text", async (ctx) => {
 
         console.error(error);
 
-        await ctx.reply("❌ حدث خطأ أثناء معالجة طلبك، حاول مرة أخرى.");
+        await ctx.reply("❌ حدث خطأ أثناء معالجة طلبك.");
 
     }
+
 });
 
 bot.launch();
+
 console.log("🤖 NAMIKAZE AI Started");
 
 process.once("SIGINT", () => bot.stop("SIGINT"));
