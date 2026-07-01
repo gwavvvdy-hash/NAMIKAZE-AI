@@ -5,14 +5,23 @@ const bot = new Telegraf(process.env.TELEGRAM_TOKEN);
 
 bot.on('text', async (ctx) => {
     try {
-        const response = await axios.post(
-            `https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key=${process.env.GEMINI_API_KEY}`,
-            { contents: [{ parts: [{ text: ctx.message.text }] }] }
-        );
-        ctx.reply(response.data.candidates[0].content.parts[0].text);
+        const userText = ctx.message.text;
+        
+        // استخدام الرابط المباشر للإصدار المستقر (v1) مع اسم النموذج الصحيح
+        const apiUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`;
+        
+        const response = await axios.post(apiUrl, {
+            contents: [{ parts: [{ text: userText }] }]
+        });
+
+        // استخراج الرد من استجابة JSON
+        const replyText = response.data.candidates[0].content.parts[0].text;
+        ctx.reply(replyText);
+        
     } catch (error) {
-        ctx.reply('خطأ: ' + (error.response?.data?.error?.message || error.message));
+        console.error("خطأ تقني:", error.response ? error.response.data : error.message);
+        ctx.reply('حدث خطأ في الاتصال. حاول مرة أخرى لاحقاً.');
     }
 });
 
-bot.launch();
+bot.launch().then(() => console.log("NAMIKAZE AI يعمل الآن!"));
