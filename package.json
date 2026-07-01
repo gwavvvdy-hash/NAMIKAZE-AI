@@ -1,11 +1,12 @@
 {
-  "name": "my-ai-bot",
+  "name": "namikaze-ai",
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
   },
   "dependencies": {
-    "telegraf": "^4.16.3"
+    "telegraf": "^4.16.3",
+    "@google/generative-ai": "^0.15.0"
   }
 }
