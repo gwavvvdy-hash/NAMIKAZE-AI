@@ -9,23 +9,23 @@ bot.on('text', async (ctx) => {
     const userText = ctx.message.text;
     const lowerText = userText.trim().toLowerCase();
 
-    // 1. قاعدة طلب الصورة (رسم احترافي)
+    // 1. قاعدة طلب الصورة (رسم احترافي مع تحسينات لمنع الأخطاء)
     if (lowerText.startsWith('صورة ') || lowerText.startsWith('ارسم ')) {
         const userPrompt = userText.split(' ').slice(1).join(' ');
         if (!userPrompt) return ctx.reply('يرجى كتابة وصف للصورة. مثال: "ارسم شخص يحمل قطة"');
         
         try {
-            await ctx.sendChatAction('typing'); 
-            // طلب وصف دقيق من جيميني ليتم إرساله لمولد الصور
-            const promptRefiner = await axios.post(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`, {
-                contents: [{ parts: [{ text: `صغ لي وصفاً دقيقاً ومفصلاً باللغة الإنجليزية لرسم صورة تعبر عن هذا الطلب: "${userPrompt}". لا تضف أي نص غير الوصف.` }] }]
-            });
-            
-            const detailedPrompt = promptRefiner.data.candidates[0].content.parts[0].text;
-            
             await ctx.sendChatAction('upload_photo');
-            const encodedPrompt = encodeURIComponent(detailedPrompt);
-            const finalImageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?nologo=true&width=1024&height=1024&model=flux`; 
+            
+            // الوصف الاحترافي والوصف السلبي لمنع التشوهات
+            const refinedPrompt = `masterpiece, best quality, highly detailed, ${userPrompt}, 8k resolution, photorealistic`;
+            const negativePrompt = "deformed, distorted, disfigured, human cat face, extra limbs, bad anatomy, blurry, low quality, cartoon, drawing";
+            
+            const encodedPrompt = encodeURIComponent(refinedPrompt);
+            const encodedNegative = encodeURIComponent(negativePrompt);
+            
+            // الرابط مع إضافة المحددات لمنع الأخطاء
+            const finalImageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?negative=${encodedNegative}&width=1024&height=1024&nologo=true&model=flux`; 
             
             return await ctx.replyWithPhoto({ url: finalImageUrl }, { caption: `NAMIKAZE AI رسم لك: ${userPrompt}` });
         } catch (error) {
@@ -51,7 +51,7 @@ bot.on('text', async (ctx) => {
         return ctx.reply('أنا هو NAMIKAZE AI وتم تطويري من قبل @Namikaze_YT لأكون مساعدك الشخصي على تيليجرام');
     }
 
-    // 5. الرد الذكي المعتاد
+    // 5. الرد الذكي المعتاد (Gemini)
     try {
         await ctx.sendChatAction('typing');
         const context = userMemory[chatId] ? `المستخدم يتحدث معك واسمه: ${userMemory[chatId]}` : "المستخدم غير معروف";
@@ -66,4 +66,4 @@ bot.on('text', async (ctx) => {
     }
 });
 
-bot.launch().then(() => console.log("NAMIKAZE AI يعمل الآن بكامل الميزات!"));
+bot.launch().then(() => console.log("NAMIKAZE AI يعمل الآن مع ميزة الرسم المحسن!"));
