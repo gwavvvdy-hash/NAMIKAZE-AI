@@ -3,6 +3,11 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 const axios = require('axios');
 
 const bot = new Telegraf(process.env.TELEGRAM_TOKEN);
+
+// هذا السطر هو الحل الجذري لمشكلة الـ 409 (Conflict)
+// يقوم بقطع أي اتصال قديم أو معلق مع خوادم تليجرام
+bot.telegram.deleteWebhook({ drop_pending_updates: true });
+
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const userMemory = {};
 
@@ -19,9 +24,9 @@ bot.on('text', async (ctx) => {
         try {
             await ctx.sendChatAction('upload_photo');
             
-            // استخدام Gemini لصياغة وصف دقيق بالإنجليزية لزيادة الواقعية
+            // استخدام Gemini لصياغة وصف احترافي للرسم
             const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-            const result = await model.generateContent(`Create a detailed, photorealistic prompt for: ${prompt}. Return only the prompt in English.`);
+            const result = await model.generateContent(`Create a detailed, high-quality prompt for: ${prompt}. Return only the prompt in English.`);
             const refinedPrompt = result.response.text();
             
             const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(refinedPrompt)}?model=flux&width=1024&height=1024&nologo=true`;
@@ -54,4 +59,8 @@ bot.on('text', async (ctx) => {
     }
 });
 
-bot.launch().then(() => console.log("NAMIKAZE AI يعمل الآن بكامل طاقته!"));
+// تشغيل البوت مع معالجة إغلاق العملية
+bot.launch().then(() => console.log("NAMIKAZE AI يعمل الآن بنجاح وبدون تعارض!"));
+
+process.once('SIGINT', () => bot.stop('SIGINT'));
+process.once('SIGTERM', () => bot.stop('SIGTERM'));
