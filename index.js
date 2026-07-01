@@ -1,12 +1,13 @@
 const { Telegraf } = require('telegraf');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
+const axios = require('axios');
 
 const bot = new Telegraf(process.env.TELEGRAM_TOKEN);
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 bot.telegram.deleteWebhook({ drop_pending_updates: true }).then(() => {
     bot.launch({ dropPendingUpdates: true });
-    console.log("NAMIKAZE AI يعمل الآن مع نموذج Imagen 4!");
+    console.log("NAMIKAZE AI يعمل الآن مع Imagen 4 و Gemini 3.5 Flash!");
 });
 
 bot.on('text', async (ctx) => {
@@ -21,33 +22,35 @@ bot.on('text', async (ctx) => {
         await ctx.sendChatAction('upload_photo');
         
         try {
-            // استخدام نموذج Imagen 4 المدمج في جوجل
-            const model = genAI.getGenerativeModel({ model: 'imagen-4.0-generate-001' });
-            
-            const result = await model.generateContent(prompt);
-            const response = await result.response;
-            
-            // استخراج رابط الصورة
-            const image = response.candidates[0].content.parts[0].imageBytes; 
-            // ملاحظة: قد تختلف طريقة إخراج الصورة حسب تحديث المكتبة، 
-            // إذا لم يرسل الصورة، أخبرني لنعدل طريقة المعالجة.
-            
-            return ctx.replyWithPhoto({ source: Buffer.from(image, 'base64') }, { 
-                caption: `NAMIKAZE AI - Imagen 4:\n${prompt}` 
+            const response = await axios.post(
+                `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${process.env.GEMINI_API_KEY}`,
+                {
+                    instances: [{ prompt: prompt }],
+                    params: { sampleCount: 1 }
+                }
+            );
+
+            const base64Image = response.data.predictions[0].bytesBase64Encoded;
+            return ctx.replyWithPhoto({ source: Buffer.from(base64Image, 'base64') }, {
+                caption: `NAMIKAZE AI - Imagen 4:\n${prompt}`
             });
         } catch (error) {
-            console.error("خطأ في Imagen 4:", error);
-            ctx.reply("حدث خطأ أثناء توليد الصورة.");
+            console.error("خطأ Imagen:", error.response ? error.response.data : error.message);
+            return ctx.reply("عذراً، فشل توليد الصورة. ربما نموذج Imagen غير متاح لمفتاح الـ API الخاص بك حالياً.");
         }
     }
 
-    // 2. المحادثة الذكية (Gemini 3.5 Flash)
+    // 2. المحادثة الذكية باستخدام Gemini 3.5 Flash
     try {
         await ctx.sendChatAction('typing');
         const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
         const result = await model.generateContent(userText);
         await ctx.reply(result.response.text());
     } catch (error) {
-        ctx.reply('حدث خطأ تقني.');
+        console.error("خطأ في المحادثة:", error);
+        ctx.reply('حدث خطأ في معالجة النص.');
     }
 });
+
+process.once('SIGINT', () => bot.stop('SIGINT'));
+process.once('SIGTERM', () => bot.stop('SIGTERM'));
