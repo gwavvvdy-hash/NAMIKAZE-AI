@@ -28,27 +28,26 @@ bot.on("text", async (ctx) => {
         try {
 
             const generate = await axios.post(
-                "https://aihorde.net/api/v2/generate/async",
-                {
-                    prompt: `${prompt}, masterpiece, best quality, ultra detailed, cinematic lighting, sharp focus`,
-                  params: {
-  width: 512,
-  height: 512,
-  steps: 20,
-  cfg_scale: 7,
-  sampler_name: "k_euler",
-  n: 1
-}
-                    nsfw: false
-                },
-                {
-                    headers: {
-                        "Content-Type": "application/json",
-                        "apikey": process.env.AI_HORDE_API_KEY,
-                        "Client-Agent": "NAMIKAZE AI"
-                    }
-                }
-            );
+  "https://aihorde.net/api/v2/generate/async",
+  {
+    prompt: `${prompt}, masterpiece, best quality, ultra detailed, cinematic lighting, sharp focus`,
+    params: {
+      width: 512,
+      height: 512,
+      steps: 20,
+      cfg_scale: 7,
+      sampler_name: "k_euler",
+      n: 1
+    },
+    nsfw: false
+  },
+  {
+    headers: {
+      apikey: process.env.AI_HORDE_API_KEY,
+      "Content-Type": "application/json"
+    }
+  }
+);
 
             const id = generate.data.id;
 
