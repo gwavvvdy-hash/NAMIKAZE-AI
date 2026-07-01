@@ -1,11 +1,9 @@
 require("dotenv").config();
 
 const { Telegraf } = require("telegraf");
-const { GoogleGenerativeAI } = require("@google/generative-ai");
 const axios = require("axios");
 
 const bot = new Telegraf(process.env.TELEGRAM_TOKEN);
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 bot.on("text", async (ctx) => {
     const userText = ctx.message.text;
@@ -31,7 +29,7 @@ bot.on("text", async (ctx) => {
             const generate = await axios.post(
                 "https://aihorde.net/api/v2/generate/async",
                 {
-                    prompt: `${prompt}, masterpiece, best quality, ultra detailed, photorealistic, cinematic lighting, sharp focus, perfect anatomy, realistic face, realistic eyes, 8k`,
+                    prompt: `${prompt}, masterpiece, best quality, ultra detailed, photorealistic, cinematic lighting, sharp focus`,
                     params: {
                         width: 1024,
                         height: 1024,
@@ -54,7 +52,6 @@ bot.on("text", async (ctx) => {
             const id = generate.data.id;
 
             while (true) {
-
                 await new Promise(resolve => setTimeout(resolve, 3000));
 
                 const status = await axios.get(
@@ -73,12 +70,10 @@ bot.on("text", async (ctx) => {
                     throw new Error("No image generated");
                 }
 
-                const imageUrl = status.data.generations[0].img;
-
                 await ctx.deleteMessage(waitMsg.message_id);
 
                 return ctx.replyWithPhoto(
-                    { url: imageUrl },
+                    { url: status.data.generations[0].img },
                     {
                         caption: `🖼️ ${prompt}`
                     }
@@ -92,26 +87,36 @@ bot.on("text", async (ctx) => {
     }
 
     // ===========================
-    // Gemini Chat
+    // Gemini via OpenRouter
     // ===========================
     try {
 
         await ctx.sendChatAction("typing");
 
-        const model = genAI.getGenerativeModel({
-            model: "gemini-2.5-flash"
-        });
+        const response = await axios.post(
+            "https://openrouter.ai/api/v1/chat/completions",
+            {
+                model: "google/gemini-2.5-flash",
+                messages: [
+                    {
+                        role: "user",
+                        content: userText
+                    }
+                ]
+            },
+            {
+                headers: {
+                    "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
+                    "Content-Type": "application/json"
+                }
+            }
+        );
 
-        const result = await model.generateContent(userText);
-
-        await ctx.reply(result.response.text());
+        await ctx.reply(response.data.choices[0].message.content);
 
     } catch (error) {
-
-        console.error(error);
-
-        await ctx.reply("❌ حدث خطأ أثناء معالجة طلبك، حاول مرة أخرى.");
-
+        console.error(error.response?.data || error.message);
+        await ctx.reply("❌ حدث خطأ أثناء معالجة طلبك.");
     }
 });
 
