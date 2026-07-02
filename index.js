@@ -20,16 +20,26 @@ function saveUserFile(fileName, data) {
 
 // --- الأوامر ---
 bot.command("start", (ctx) => {
-    ctx.reply("هلا بيك! أنا NAMIKAZE AI. استخدم /new [اسم] لفتح سجل جديد، و /history لعرض السجلات.");
+    ctx.reply("هلا بيك! أنا NAMIKAZE AI.\n\nالأوامر المتاحة:\n/new [اسم] - لفتح سجل جديد\n/clear - لمسح السجل الحالي\n/history - لعرض سجلاتك والتبديل بينها");
 });
 
 bot.command("new", (ctx) => {
     const topic = ctx.message.text.split(" ").slice(1).join("_") || "General";
     const fileName = `${ctx.from.id}_${topic}.json`;
     saveUserFile(fileName, { current: [] });
-    // تعيين هذا الملف كنشط
     fs.writeFileSync(path.join(DATA_DIR, `active_${ctx.from.id}.txt`), fileName);
-    ctx.reply(`✅ تم فتح سجل جديد باسم: ${topic} وبدأنا الحوار فيه.`);
+    ctx.reply(`✅ تم فتح سجل جديد باسم: ${topic}`);
+});
+
+bot.command("clear", (ctx) => {
+    const activeFile = path.join(DATA_DIR, `active_${ctx.from.id}.txt`);
+    if (fs.existsSync(activeFile)) {
+        const fileName = fs.readFileSync(activeFile, "utf8");
+        saveUserFile(fileName, { current: [] });
+        ctx.reply("✅ تم مسح ذاكرة هذا السجل وبدأنا صفحة جديدة!");
+    } else {
+        ctx.reply("⚠️ لا يوجد سجل نشط، استخدم /new لإنشاء سجل.");
+    }
 });
 
 bot.command("history", (ctx) => {
@@ -44,9 +54,10 @@ bot.action(/load_(.+)/, (ctx) => {
     const fileName = ctx.match[1];
     fs.writeFileSync(path.join(DATA_DIR, `active_${ctx.from.id}.txt`), fileName);
     ctx.answerCbQuery(`تم التحويل إلى سجل: ${fileName.replace(ctx.from.id + "_", "").replace(".json", "")}`);
+    ctx.reply(`🔄 تم التحويل إلى سجل: ${fileName.replace(ctx.from.id + "_", "").replace(".json", "")}`);
 });
 
-// --- معالجة الرسائل العادية ---
+// --- معالجة الرسائل ---
 bot.on("message", async (ctx) => {
     if (!ctx.message.text || ctx.message.text.startsWith("/")) return;
 
@@ -82,3 +93,4 @@ bot.on("message", async (ctx) => {
 });
 
 bot.launch();
+console.log("🚀 NAMIKAZE AI is Live!");
