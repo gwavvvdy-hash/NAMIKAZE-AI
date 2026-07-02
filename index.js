@@ -25,22 +25,23 @@ bot.on("message", async (ctx) => {
     const userId = ctx.from.id;
     let userData = loadUser(userId);
     
+    // تعريف الهوية
     if (userData.current.length === 0) {
         userData.current.push({ 
             role: "system", 
-            content: "أنت NAMIKAZE AI، مساعد ذكي ومطور احترافي، تجيد اللهجة العراقية والعربية بطلاقة." 
+            content: "أنت NAMIKAZE AI، مساعد ذكي ومطور احترافي، تجيد اللهجة العراقية والعربية بطلاقة، وتتميز بالدقة في الأكواد والمنطق." 
         });
     }
 
     userData.current.push({ role: "user", content: ctx.message.text });
-    if (userData.current.length > 15) userData.current = [userData.current[0], ...userData.current.slice(-14)];
+    if (userData.current.length > 10) userData.current = [userData.current[0], ...userData.current.slice(-9)];
 
     try {
         await ctx.sendChatAction("typing");
         
         const response = await axios.post("https://openrouter.ai/api/v1/chat/completions", {
-            // الموديل المجاني المحدد من صورة image_42f9b9.png
-            model: "google/gemma-4-26b-a4b-it:free",
+            // الموديل المستقر الجديد
+            model: "google/gemma-2-27b-it",
             messages: userData.current
         }, {
             headers: {
@@ -56,10 +57,10 @@ bot.on("message", async (ctx) => {
         await ctx.reply(reply);
 
     } catch (err) {
-        console.error("خطأ في الاتصال:", err.response ? err.response.data : err.message);
-        await ctx.reply("❌ عيوني، اكو مشكلة بالاتصال. تأكد من الموديل أو جرب مرة ثانية.");
+        console.error("خطأ:", err.response ? err.response.data : err.message);
+        await ctx.reply("❌ عيوني، واجهت مشكلة تقنية بسيطة. جرب ترسل الرسالة مرة ثانية.");
     }
 });
 
 bot.launch();
-console.log("🚀 NAMIKAZE AI Started with Gemma 4 26B!");
+console.log("🚀 NAMIKAZE AI Started with Gemma-2-27B!");
