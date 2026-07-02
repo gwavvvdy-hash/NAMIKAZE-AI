@@ -92,24 +92,16 @@ bot.telegram.setMyCommands([
 
 bot.command("reset", async (ctx) => {
     const userId = ctx.from.id;
-    
-    // 1. أرشفة المحادثة الحالية
     startNewChat(userId);
-
-    // 2. دفع الرسائل للأعلى
     const spacer = ".\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n";
-    const header = "✨ —————— [ محادثة جديدة ] —————— ✨\n\nتم حفظ المحادثة السابقة في /history، وبدء صفحة جديدة.";
-    
+    const header = "✨ —————— [ محادثة جديدة ] —————— ✨\n\nتم حفظ المحادثة السابقة وبدء صفحة جديدة.";
     await ctx.reply(spacer + header);
 });
 
 bot.command("history", async (ctx) => {
     const history = getHistory(ctx.from.id);
     if (history.length === 0) return ctx.reply("📭 لا توجد محادثات محفوظة.");
-    
-    const buttons = history.map(chat => [
-        Markup.button.callback(chat.title, `history_${chat.id}`)
-    ]);
+    const buttons = history.map(chat => [Markup.button.callback(chat.title, `history_${chat.id}`)]);
     await ctx.reply("📜 اختر محادثة لاستئنافها:", Markup.inlineKeyboard(buttons));
 });
 
@@ -117,7 +109,7 @@ bot.action(/history_(.+)/, async (ctx) => {
     const id = ctx.match[1];
     const ok = restoreHistory(ctx.from.id, id);
     if (!ok) return ctx.answerCbQuery("❌ المحادثة غير موجودة.");
-    await ctx.editMessageText("✅ تم استرجاع المحادثة. يمكنك الآن الإكمال.");
+    await ctx.editMessageText("✅ تم استرجاع المحادثة.");
 });
 
 // ==========================
@@ -132,7 +124,12 @@ bot.on("message", async (ctx) => {
     if (history.length === 0) {
         history.push({
             role: "system",
-            content: `أنت مساعد ذكاء اصطناعي باسم "NAMIKAZE AI". التزم بقواعد الهوية: اسمك NAMIKAZE AI، مطورك @Namikaze_YT، وأجب بالعربية أو اللهجة العراقية.`
+            content: `أنت NAMIKAZE AI، مساعد ذكي ومطور احترافي. 
+            قواعد الرد:
+            1. أجب باللغة العربية الفصحى أو اللهجة العراقية المهذبة فقط.
+            2. يمنع منعاً باتاً خلط لغات أخرى أو الهلوسة بكلمات غير مفهومة.
+            3. التزم بالدقة الإملائية والنحوية.
+            4. اسمك NAMIKAZE AI، ومطورك هو @Namikaze_YT.`
         });
     }
 
@@ -142,7 +139,7 @@ bot.on("message", async (ctx) => {
     try {
         await ctx.sendChatAction("typing");
         const response = await axios.post("https://openrouter.ai/api/v1/chat/completions", {
-            model: "openrouter/free",
+            model: "google/gemini-flash-1.5",
             messages: history
         }, {
             headers: {
@@ -158,12 +155,12 @@ bot.on("message", async (ctx) => {
         saveCurrentChat(userId, history);
         await ctx.reply(reply);
     } catch (err) {
-        console.error(err.message);
-        await ctx.reply("❌ حدث خطأ أثناء الاتصال.");
+        console.error("خطأ:", err.response ? err.response.data : err.message);
+        await ctx.reply("❌ حدث خطأ أثناء الاتصال بالذكاء الاصطناعي.");
     }
 });
 
 bot.launch();
-console.log("🚀 NAMIKAZE AI Started");
+console.log("🚀 NAMIKAZE AI Started with Gemini Flash 1.5");
 process.once("SIGINT", () => bot.stop("SIGINT"));
 process.once("SIGTERM", () => bot.stop("SIGTERM"));
