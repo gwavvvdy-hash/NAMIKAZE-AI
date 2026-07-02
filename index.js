@@ -8,109 +8,20 @@ const path = require("path");
 const bot = new Telegraf(process.env.TELEGRAM_TOKEN);
 
 // ==========================
-// DATA FOLDER
+// DATA STORAGE
 // ==========================
 const DATA_DIR = path.join(__dirname, "data");
-if (!fs.existsSync(DATA_DIR)) {
-    fs.mkdirSync(DATA_DIR);
-}
-
-// ==========================
-// USER STORAGE
-// ==========================
-function getUserFile(userId) {
-    return path.join(DATA_DIR, `${userId}.json`);
-}
+if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR);
 
 function loadUser(userId) {
-    const file = getUserFile(userId);
-    if (!fs.existsSync(file)) {
-        return { current: [], history: [] };
-    }
+    const file = path.join(DATA_DIR, `${userId}.json`);
+    if (!fs.existsSync(file)) return { current: [], history: [] };
     return JSON.parse(fs.readFileSync(file, "utf8"));
 }
 
 function saveUser(userId, data) {
-    fs.writeFileSync(getUserFile(userId), JSON.stringify(data, null, 2));
+    fs.writeFileSync(path.join(DATA_DIR, `${userId}.json`), JSON.stringify(data, null, 2));
 }
-
-// ==========================
-// CHAT FUNCTIONS
-// ==========================
-function startNewChat(userId) {
-    const data = loadUser(userId);
-    if (data.current.length > 0) {
-        const firstUserMessage = data.current.find(m => m.role === "user");
-        data.history.unshift({
-            id: Date.now(),
-            title: firstUserMessage ? firstUserMessage.content.substring(0, 40) : "محادثة جديدة",
-            messages: [...data.current],
-            createdAt: new Date().toISOString()
-        });
-    }
-    data.current = [];
-    saveUser(userId, data);
-}
-
-function loadCurrentChat(userId) {
-    return loadUser(userId).current;
-}
-
-function saveCurrentChat(userId, messages) {
-    const data = loadUser(userId);
-    data.current = messages;
-    saveUser(userId, data);
-}
-
-function getHistory(userId) {
-    return loadUser(userId).history;
-}
-
-function restoreHistory(userId, historyId) {
-    const data = loadUser(userId);
-    const chat = data.history.find(h => h.id == historyId);
-    if (!chat) return false;
-    data.current = [...chat.messages];
-    saveUser(userId, data);
-    return true;
-}
-
-function trimConversation(messages) {
-    const system = messages[0];
-    const rest = messages.slice(1);
-    if (rest.length <= 20) return messages;
-    return [system, ...rest.slice(rest.length - 20)];
-}
-
-// ==========================
-// BOT COMMANDS
-// ==========================
-bot.telegram.setMyCommands([
-    { command: "reset", description: "🔄 بدء محادثة جديدة" },
-    { command: "history", description: "📜 سجل المحادثات" }
-]);
-
-bot.command("reset", async (ctx) => {
-    const userId = ctx.from.id;
-    startNewChat(userId);
-    const spacer = ".\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n";
-    const header = "✨ —————— [ محادثة جديدة ] —————— ✨\n\nتم حفظ المحادثة السابقة وبدء صفحة جديدة.";
-    await ctx.reply(spacer + header);
-});
-
-bot.command("history", async (ctx) => {
-    const history = getHistory(ctx.from.id);
-    if (history.length === 0) return ctx.reply("📭 لا توجد محادثات محفوظة.");
-    const buttons = history.map(chat => [Markup.button.callback(chat.title, `history_${chat.id}`)]);
-    await ctx.reply("📜 اختر محادثة لاستئنافها:", Markup.inlineKeyboard(buttons));
-});
-
-bot.action(/history_(.+)/, async (ctx) => {
-    const id = ctx.match[1];
-    const ok = restoreHistory(ctx.from.id, id);
-    if (!ok) return ctx.answerCbQuery("❌ المحادثة غير موجودة.");
-    await ctx.editMessageText("✅ تم استرجاع المحادثة.");
-});
 
 // ==========================
 // AI CHAT
@@ -119,28 +30,24 @@ bot.on("message", async (ctx) => {
     if (!ctx.message.text || ctx.message.text.startsWith("/")) return;
 
     const userId = ctx.from.id;
-    let history = loadCurrentChat(userId);
-
-    if (history.length === 0) {
-        history.push({
-            role: "system",
-            content: `أنت NAMIKAZE AI، مساعد ذكي ومطور احترافي. 
-            قواعد الرد:
-            1. أجب باللغة العربية الفصحى أو اللهجة العراقية المهذبة فقط.
-            2. يمنع منعاً باتاً خلط لغات أخرى أو الهلوسة بكلمات غير مفهومة.
-            3. التزم بالدقة الإملائية والنحوية.
-            4. اسمك NAMIKAZE AI، ومطورك هو @Namikaze_YT.`
-        });
+    let userData = loadUser(userId);
+    
+    if (userData.current.length === 0) {
+        userData.current.push({ role: "system", content: "أنت مساعد ذكي ومطور احترافي." });
     }
 
-    history.push({ role: "user", content: ctx.message.text });
-    history = trimConversation(history);
+    userData.current.push({ role: "user", content: ctx.message.text });
+    
+    // تقليص المحادثة للحفاظ على الذاكرة
+    if (userData.current.length > 20) {
+        userData.current = [userData.current[0], ...userData.current.slice(-19)];
+    }
 
     try {
         await ctx.sendChatAction("typing");
         const response = await axios.post("https://openrouter.ai/api/v1/chat/completions", {
-            model: "google/gemini-pro-1.5",
-            messages: history
+            model: "google/gemini-2.0-flash-lite-001", // الموديل المطلوب اختباره
+            messages: userData.current
         }, {
             headers: {
                 Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
@@ -149,18 +56,29 @@ bot.on("message", async (ctx) => {
             }
         });
 
-        const reply = response.data.choices?.[0]?.message?.content || "❌ لم يصل رد.";
-        history.push({ role: "assistant", content: reply });
-        history = trimConversation(history);
-        saveCurrentChat(userId, history);
+        const reply = response.data.choices?.[0]?.message?.content || "❌ لا يوجد رد.";
+        userData.current.push({ role: "assistant", content: reply });
+        saveUser(userId, userData);
         await ctx.reply(reply);
+
     } catch (err) {
-        console.error("خطأ:", err.response ? err.response.data : err.message);
-        await ctx.reply("❌ حدث خطأ أثناء الاتصال بالذكاء الاصطناعي.");
+        let errorMessage = "❌ حدث خطأ في الاتصال.\n\n";
+        
+        if (err.response && err.response.data && err.response.data.error) {
+            const errorData = err.response.data.error;
+            errorMessage += `السبب: ${errorData.message || "خطأ غير معروف"}\n\n`;
+            
+            // استخراج الموديلات المتاحة من استجابة الخطأ
+            if (errorData.models && Array.isArray(errorData.models)) {
+                errorMessage += "💡 الموديلات المتاحة لمفتاحك:\n• " + errorData.models.slice(0, 15).join("\n• ");
+            }
+        } else {
+            errorMessage += `التفاصيل: ${err.message}`;
+        }
+
+        await ctx.reply(errorMessage);
     }
 });
 
 bot.launch();
-console.log("🚀 NAMIKAZE AI Started with Gemini Pro 1.5");
-process.once("SIGINT", () => bot.stop("SIGINT"));
-process.once("SIGTERM", () => bot.stop("SIGTERM"));
+console.log("🚀 NAMIKAZE AI Started with Auto-Debug Mode");
