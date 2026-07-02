@@ -20,23 +20,18 @@ function saveUserFile(fileName, data) {
 
 // --- الأوامر ---
 bot.command("start", (ctx) => {
-    ctx.reply("هلا بيك! أنا NAMIKAZE AI.\n\nالأوامر المتاحة:\n/new chat [اسم الموضوع] - لفتح سجل جديد\n/clear - لمسح السجل الحالي\n/history - لعرض سجلاتك والتبديل بينها");
+    ctx.reply("هلا بيك! أنا NAMIKAZE AI.\n\nاستخدم القائمة (Menu) للتحكم في محادثاتك.");
 });
 
-bot.command("new", (ctx) => {
-    const args = ctx.message.text.split(" ").slice(1);
+// الأمر الجديد المعتمد في القائمة
+bot.command("new_chat", (ctx) => {
+    const topic = ctx.message.text.split(" ").slice(1).join("_") || "محادثة_جديدة";
+    const fileName = `${ctx.from.id}_${topic}.json`;
     
-    if (args[0] === "chat") {
-        const topic = args.slice(1).join("_") || "محادثة_جديدة";
-        const fileName = `${ctx.from.id}_${topic}.json`;
-        
-        saveUserFile(fileName, { current: [] });
-        fs.writeFileSync(path.join(DATA_DIR, `active_${ctx.from.id}.txt`), fileName);
-        
-        ctx.reply(`—————— [ ${topic.replace(/_/g, " ")} ] ——————\n\nتم حفظ المحادثة السابقة وبدء صفحة جديدة.`);
-    } else {
-        ctx.reply("⚠️ التنسيق الصحيح هو: `/new chat [اسم الموضوع]`");
-    }
+    saveUserFile(fileName, { current: [] });
+    fs.writeFileSync(path.join(DATA_DIR, `active_${ctx.from.id}.txt`), fileName);
+    
+    ctx.reply(`—————— [ ${topic.replace(/_/g, " ")} ] ——————\n\nتم حفظ المحادثة السابقة وبدء صفحة جديدة.`);
 });
 
 bot.command("clear", (ctx) => {
@@ -46,7 +41,7 @@ bot.command("clear", (ctx) => {
         saveUserFile(fileName, { current: [] });
         ctx.reply("✅ تم مسح ذاكرة هذا السجل وبدأنا صفحة جديدة!");
     } else {
-        ctx.reply("⚠️ لا يوجد سجل نشط، استخدم /new chat [الاسم] للبدء.");
+        ctx.reply("⚠️ لا يوجد سجل نشط.");
     }
 });
 
@@ -105,5 +100,13 @@ bot.on("message", async (ctx) => {
     }
 });
 
-bot.launch();
-console.log("🚀 NAMIKAZE AI is Live!");
+// تشغيل البوت وضبط القائمة
+bot.launch().then(() => {
+    bot.telegram.setMyCommands([
+        { command: "start", description: "تشغيل البوت" },
+        { command: "new_chat", description: "بدء محادثة جديدة" },
+        { command: "history", description: "سجل المحادثات" },
+        { command: "clear", description: "مسح السجل الحالي" }
+    ]);
+    console.log("🚀 NAMIKAZE AI is Live!");
+});
