@@ -1,96 +1,66 @@
 require("dotenv").config();
-
-const { Telegraf } = require("telegraf");
+const { Telegraf, Markup } = require("telegraf");
 const axios = require("axios");
 const fs = require("fs");
 const path = require("path");
 
 const bot = new Telegraf(process.env.TELEGRAM_TOKEN);
 const DATA_DIR = path.join(__dirname, "data");
-
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR);
 
-function loadUser(userId) {
-    const file = path.join(DATA_DIR, `${userId}.json`);
-    return fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, "utf8")) : { current: [] };
-}
+// وظائف الإدارة
+function getFiles() { return fs.readdirSync(DATA_DIR).filter(f => f.endsWith('.json')); }
 
-function saveUser(userId, data) {
-    fs.writeFileSync(path.join(DATA_DIR, `${userId}.json`), JSON.stringify(data, null, 2));
-}
-
-// --- قسم الأوامر ---
 bot.command("start", (ctx) => {
-    ctx.reply("هلا والله! أنا NAMIKAZE AI، مساعدك الذكي. أنا حاضر لأي سؤال تقني أو برمجي. شلون أگدر أساعدك اليوم؟");
+    ctx.reply("هلا بيك! أنا NAMIKAZE AI. استخدم /new [اسم_الموضوع] لفتح سجل جديد، و /history لعرض السجلات.");
 });
 
-bot.command("clear", (ctx) => {
+// فتح سجل جديد
+bot.command("new", (ctx) => {
+    const topic = ctx.message.text.split(" ").slice(1).join("_") || "General";
     const userId = ctx.from.id;
-    saveUser(userId, { current: [] });
-    ctx.reply("تم مسح الذاكرة بنجاح، نبلش صفحة جديدة؟");
+    const fileName = `${userId}_${topic}.json`;
+    fs.writeFileSync(path.join(DATA_DIR, fileName), JSON.stringify({ current: [] }));
+    ctx.reply(`✅ تم فتح سجل جديد باسم: ${topic}`);
 });
 
-// أمر سجل المحادثات الجديد
+// عرض السجلات مع أزرار للتبديل
 bot.command("history", (ctx) => {
     const userId = ctx.from.id;
-    const userData = loadUser(userId);
+    const files = getFiles().filter(f => f.startsWith(userId.toString()));
     
-    if (userData.current.length <= 1) { // 1 لأن الـ system prompt محجوزة
-        return ctx.reply("سجل المحادثات فارغ حالياً.");
-    }
+    if (files.length === 0) return ctx.reply("ماكو سجلات حالياً. ابدأ واحد بـ /new");
 
-    let historyText = "📜 *سجل المحادثات*:\n\n";
-    // نعرض آخر 6 رسائل ليكون التنسيق مرتباً
-    userData.current.slice(-7).forEach(msg => {
-        if (msg.role !== "system") {
-            const name = msg.role === "user" ? "أنت" : "NAMIKAZE";
-            historyText += `*${name}*: ${msg.content.substring(0, 60)}${msg.content.length > 60 ? '...' : ''}\n`;
-        }
+    const buttons = files.map(f => {
+        const topic = f.replace(`${userId}_`, "").replace(".json", "");
+        return [Markup.button.callback(`📁 ${topic}`, `load_${f}`)];
     });
-    ctx.replyWithMarkdown(historyText);
+
+    ctx.reply("📜 سجل المحادثات (اضغط للتبديل):", Markup.inlineKeyboard(buttons));
 });
 
-// --- قسم المحادثة الذكية ---
-bot.on("message", async (ctx) => {
-    if (!ctx.message.text) return;
-
+// التعامل مع ضغطات الأزرار (التبديل بين السجلات)
+bot.action(/load_(.+)/, (ctx) => {
+    const fileName = ctx.match[1];
+    // نحفظ الملف النشط في ذاكرة مؤقتة بسيطة أو نعتمد على تغيير اسم الملف النشط
+    // للتبسيط: سنقوم بتغيير اسم ملف خاص باسم 'active_userId.txt'
     const userId = ctx.from.id;
-    let userData = loadUser(userId);
+    fs.writeFileSync(path.join(DATA_DIR, `active_${userId}.txt`), fileName);
+    ctx.reply(`🔄 تم التحويل إلى سجل: ${fileName.replace(userId + "_", "").replace(".json", "")}`);
+});
+
+// المحادثة الذكية (تستخدم الملف النشط)
+bot.on("message", async (ctx) => {
+    const userId = ctx.from.id;
+    const activeFile = path.join(DATA_DIR, `active_${userId}.txt`);
+    const fileName = fs.existsSync(activeFile) ? fs.readFileSync(activeFile, "utf8") : `${userId}_General.json`;
     
-    if (userData.current.length === 0) {
-        userData.current.push({ 
-            role: "system", 
-            content: "أنت NAMIKAZE AI، مساعد ذكي ومطور احترافي، تجيد اللهجة العراقية والعربية بطلاقة، وتتميز بالدقة في الأكواد والمنطق." 
-        });
-    }
+    const filePath = path.join(DATA_DIR, fileName);
+    let data = fs.existsSync(filePath) ? JSON.parse(fs.readFileSync(filePath, "utf8")) : { current: [] };
 
-    userData.current.push({ role: "user", content: ctx.message.text });
-    if (userData.current.length > 10) userData.current = [userData.current[0], ...userData.current.slice(-9)];
-
-    try {
-        await ctx.sendChatAction("typing");
-        
-        const response = await axios.post("https://openrouter.ai/api/v1/chat/completions", {
-            model: "google/gemma-2-27b-it",
-            messages: userData.current
-        }, {
-            headers: {
-                Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
-                "HTTP-Referer": "https://github.com/namikaze-ai",
-                "X-Title": "NAMIKAZE AI"
-            }
-        });
-
-        const reply = response.data.choices?.[0]?.message?.content;
-        userData.current.push({ role: "assistant", content: reply });
-        saveUser(userId, userData);
-        await ctx.reply(reply);
-
-    } catch (err) {
-        console.error("خطأ:", err.response ? err.response.data : err.message);
-        await ctx.reply("❌ عيوني، واجهت مشكلة تقنية بسيطة. جرب ترسل الرسالة مرة ثانية.");
-    }
+    data.current.push({ role: "user", content: ctx.message.text });
+    // ... (هنا ضع كود الاتصال بالـ API كما في الكود السابق) ...
+    // لا تنسَ حفظ البيانات في الـ filePath نفسه
 });
 
 bot.launch();
-console.log("🚀 NAMIKAZE AI Ready with History Feature!");
