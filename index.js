@@ -139,7 +139,7 @@ bot.on("message", async (ctx) => {
     try {
         await ctx.sendChatAction("typing");
         const response = await axios.post("https://openrouter.ai/api/v1/chat/completions", {
-            model: "google/gemini-flash-1.5",
+            model: "google/gemini-pro-1.5",
             messages: history
         }, {
             headers: {
@@ -161,6 +161,6 @@ bot.on("message", async (ctx) => {
 });
 
 bot.launch();
-console.log("🚀 NAMIKAZE AI Started with Gemini Flash 1.5");
+console.log("🚀 NAMIKAZE AI Started with Gemini Pro 1.5");
 process.once("SIGINT", () => bot.stop("SIGINT"));
 process.once("SIGTERM", () => bot.stop("SIGTERM"));
