@@ -19,13 +19,44 @@ function saveUser(userId, data) {
     fs.writeFileSync(path.join(DATA_DIR, `${userId}.json`), JSON.stringify(data, null, 2));
 }
 
+// --- قسم الأوامر ---
+bot.command("start", (ctx) => {
+    ctx.reply("هلا والله! أنا NAMIKAZE AI، مساعدك الذكي. أنا حاضر لأي سؤال تقني أو برمجي. شلون أگدر أساعدك اليوم؟");
+});
+
+bot.command("clear", (ctx) => {
+    const userId = ctx.from.id;
+    saveUser(userId, { current: [] });
+    ctx.reply("تم مسح الذاكرة بنجاح، نبلش صفحة جديدة؟");
+});
+
+// أمر سجل المحادثات الجديد
+bot.command("history", (ctx) => {
+    const userId = ctx.from.id;
+    const userData = loadUser(userId);
+    
+    if (userData.current.length <= 1) { // 1 لأن الـ system prompt محجوزة
+        return ctx.reply("سجل المحادثات فارغ حالياً.");
+    }
+
+    let historyText = "📜 *سجل المحادثات*:\n\n";
+    // نعرض آخر 6 رسائل ليكون التنسيق مرتباً
+    userData.current.slice(-7).forEach(msg => {
+        if (msg.role !== "system") {
+            const name = msg.role === "user" ? "أنت" : "NAMIKAZE";
+            historyText += `*${name}*: ${msg.content.substring(0, 60)}${msg.content.length > 60 ? '...' : ''}\n`;
+        }
+    });
+    ctx.replyWithMarkdown(historyText);
+});
+
+// --- قسم المحادثة الذكية ---
 bot.on("message", async (ctx) => {
-    if (!ctx.message.text || ctx.message.text.startsWith("/")) return;
+    if (!ctx.message.text) return;
 
     const userId = ctx.from.id;
     let userData = loadUser(userId);
     
-    // تعريف الهوية
     if (userData.current.length === 0) {
         userData.current.push({ 
             role: "system", 
@@ -40,7 +71,6 @@ bot.on("message", async (ctx) => {
         await ctx.sendChatAction("typing");
         
         const response = await axios.post("https://openrouter.ai/api/v1/chat/completions", {
-            // الموديل المستقر الجديد
             model: "google/gemma-2-27b-it",
             messages: userData.current
         }, {
@@ -63,4 +93,4 @@ bot.on("message", async (ctx) => {
 });
 
 bot.launch();
-console.log("🚀 NAMIKAZE AI Started with Gemma-2-27B!");
+console.log("🚀 NAMIKAZE AI Ready with History Feature!");
