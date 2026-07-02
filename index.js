@@ -11,10 +11,7 @@ if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR);
 // --- وظائف مساعدة ---
 function loadUserFile(fileName) {
     const filePath = path.join(DATA_DIR, fileName);
-    if (!fs.existsSync(filePath)) {
-        return { current: [] };
-    }
-    return JSON.parse(fs.readFileSync(filePath, "utf8"));
+    return fs.existsSync(filePath) ? JSON.parse(fs.readFileSync(filePath, "utf8")) : { current: [] };
 }
 
 function saveUserFile(fileName, data) {
@@ -23,22 +20,22 @@ function saveUserFile(fileName, data) {
 
 // --- الأوامر ---
 bot.command("start", (ctx) => {
-    ctx.reply("هلا بيك! أنا NAMIKAZE AI.\n\nالأوامر المتاحة:\n/new chat [اسم] - لفتح سجل جديد\n/clear - لمسح السجل الحالي\n/history - لعرض سجلاتك والتبديل بينها");
+    ctx.reply("هلا بيك! أنا NAMIKAZE AI.\n\nالأوامر المتاحة:\n/new chat [اسم الموضوع] - لفتح سجل جديد\n/clear - لمسح السجل الحالي\n/history - لعرض سجلاتك والتبديل بينها");
 });
 
 bot.command("new", (ctx) => {
     const args = ctx.message.text.split(" ").slice(1);
     
     if (args[0] === "chat") {
-        const topic = args.slice(1).join("_") || "General";
+        const topic = args.slice(1).join("_") || "محادثة_جديدة";
         const fileName = `${ctx.from.id}_${topic}.json`;
         
         saveUserFile(fileName, { current: [] });
         fs.writeFileSync(path.join(DATA_DIR, `active_${ctx.from.id}.txt`), fileName);
         
-        ctx.reply(`✅ تم فتح سجل جديد باسم: ${topic}`);
+        ctx.reply(`—————— [ ${topic.replace(/_/g, " ")} ] ——————\n\nتم حفظ المحادثة السابقة وبدء صفحة جديدة.`);
     } else {
-        ctx.reply("⚠️ التنسيق الصحيح هو: `/new chat [اسم السجل]`");
+        ctx.reply("⚠️ التنسيق الصحيح هو: `/new chat [اسم الموضوع]`");
     }
 });
 
@@ -49,23 +46,23 @@ bot.command("clear", (ctx) => {
         saveUserFile(fileName, { current: [] });
         ctx.reply("✅ تم مسح ذاكرة هذا السجل وبدأنا صفحة جديدة!");
     } else {
-        ctx.reply("⚠️ لا يوجد سجل نشط، استخدم `/new chat [الاسم]` للبدء.");
+        ctx.reply("⚠️ لا يوجد سجل نشط، استخدم /new chat [الاسم] للبدء.");
     }
 });
 
 bot.command("history", (ctx) => {
     const files = fs.readdirSync(DATA_DIR).filter(f => f.startsWith(ctx.from.id.toString()));
-    if (files.length === 0) return ctx.reply("لا توجد سجلات. استخدم `/new chat [الاسم]` لإنشاء واحد.");
+    if (files.length === 0) return ctx.reply("لا توجد سجلات.");
     
-    const buttons = files.map(f => [Markup.button.callback(`📁 ${f.replace(ctx.from.id + "_", "").replace(".json", "")}`, `load_${f}`)]);
+    const buttons = files.map(f => [Markup.button.callback(`📁 ${f.replace(ctx.from.id + "_", "").replace(".json", "").replace(/_/g, " ")}`, `load_${f}`)]);
     ctx.reply("📜 سجل المحادثات (اضغط للتبديل):", Markup.inlineKeyboard(buttons));
 });
 
 bot.action(/load_(.+)/, (ctx) => {
     const fileName = ctx.match[1];
     fs.writeFileSync(path.join(DATA_DIR, `active_${ctx.from.id}.txt`), fileName);
-    ctx.answerCbQuery(`تم التحويل إلى سجل: ${fileName.replace(ctx.from.id + "_", "").replace(".json", "")}`);
-    ctx.reply(`🔄 تم التحويل إلى سجل: ${fileName.replace(ctx.from.id + "_", "").replace(".json", "")}`);
+    ctx.answerCbQuery(`تم التحويل إلى: ${fileName.replace(ctx.from.id + "_", "").replace(".json", "").replace(/_/g, " ")}`);
+    ctx.reply(`🔄 تم التحويل إلى سجل: ${fileName.replace(ctx.from.id + "_", "").replace(".json", "").replace(/_/g, " ")}`);
 });
 
 // --- معالجة الرسائل ---
@@ -74,12 +71,7 @@ bot.on("message", async (ctx) => {
 
     const userId = ctx.from.id;
     const activeFile = path.join(DATA_DIR, `active_${userId}.txt`);
-    
-    // تأمين الحالة في حال عدم وجود ملف نشط
-    let fileName = `${userId}_General.json`;
-    if (fs.existsSync(activeFile)) {
-        fileName = fs.readFileSync(activeFile, "utf8");
-    }
+    const fileName = fs.existsSync(activeFile) ? fs.readFileSync(activeFile, "utf8") : `${userId}_General.json`;
     
     let data = loadUserFile(fileName);
 
@@ -88,7 +80,6 @@ bot.on("message", async (ctx) => {
     }
 
     data.current.push({ role: "user", content: ctx.message.text });
-    // الحفاظ على طول المحادثة
     if (data.current.length > 10) data.current = [data.current[0], ...data.current.slice(-9)];
 
     try {
@@ -110,7 +101,6 @@ bot.on("message", async (ctx) => {
         
         await ctx.reply(reply, { parse_mode: "Markdown" });
     } catch (err) {
-        console.error("API Error:", err.response?.data || err.message);
         await ctx.reply("❌ عيوني، واجهت مشكلة تقنية، جرب مرة ثانية.");
     }
 });
