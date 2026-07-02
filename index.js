@@ -6,47 +6,47 @@ const fs = require("fs");
 const path = require("path");
 
 const bot = new Telegraf(process.env.TELEGRAM_TOKEN);
-
-// ==========================
-// DATA STORAGE
-// ==========================
 const DATA_DIR = path.join(__dirname, "data");
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR);
 
+// وظيفة حفظ واسترجاع المحادثة (نظام الذاكرة)
 function loadUser(userId) {
     const file = path.join(DATA_DIR, `${userId}.json`);
-    if (!fs.existsSync(file)) return { current: [], history: [] };
-    return JSON.parse(fs.readFileSync(file, "utf8"));
+    return fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, "utf8")) : { current: [] };
 }
 
 function saveUser(userId, data) {
     fs.writeFileSync(path.join(DATA_DIR, `${userId}.json`), JSON.stringify(data, null, 2));
 }
 
-// ==========================
-// AI CHAT
-// ==========================
 bot.on("message", async (ctx) => {
     if (!ctx.message.text || ctx.message.text.startsWith("/")) return;
 
     const userId = ctx.from.id;
     let userData = loadUser(userId);
     
+    // تعريف هوية البوت (هنا يكمن سر اللهجة العراقية والذكاء)
     if (userData.current.length === 0) {
-        userData.current.push({ role: "system", content: "أنت مساعد ذكي ومطور احترافي." });
+        userData.current.push({ 
+            role: "system", 
+            content: `أنت NAMIKAZE AI، مساعد ذكاء اصطناعي متطور. 
+            قواعدك:
+            1. أجب باللهجة العراقية القريبة للقلب أو العربية الفصحى.
+            2. أنت مبرمج وخبير تقني، تفهم الكود والمنطق.
+            3. لا تستخدم لغات غريبة، أجب بوضوح.
+            4. التزم بالهوية العراقية في أسلوبك (ودود، ذكي، وواثق).
+            5. اسمك NAMIKAZE AI ومطورك @Namikaze_YT.` 
+        });
     }
 
     userData.current.push({ role: "user", content: ctx.message.text });
-    
-    // تقليص المحادثة للحفاظ على الذاكرة
-    if (userData.current.length > 20) {
-        userData.current = [userData.current[0], ...userData.current.slice(-19)];
-    }
+    if (userData.current.length > 15) userData.current = [userData.current[0], ...userData.current.slice(-14)];
 
     try {
         await ctx.sendChatAction("typing");
         const response = await axios.post("https://openrouter.ai/api/v1/chat/completions", {
-            model: "google/gemini-2.0-flash-lite-001", // الموديل المطلوب اختباره
+            // اختر الموديل الأفضل من قائمتك المجانية (Gemma 4 26B)
+            model: "google/gemma-4-26b-it",
             messages: userData.current
         }, {
             headers: {
@@ -56,29 +56,16 @@ bot.on("message", async (ctx) => {
             }
         });
 
-        const reply = response.data.choices?.[0]?.message?.content || "❌ لا يوجد رد.";
+        const reply = response.data.choices?.[0]?.message?.content;
         userData.current.push({ role: "assistant", content: reply });
         saveUser(userId, userData);
         await ctx.reply(reply);
 
     } catch (err) {
-        let errorMessage = "❌ حدث خطأ في الاتصال.\n\n";
-        
-        if (err.response && err.response.data && err.response.data.error) {
-            const errorData = err.response.data.error;
-            errorMessage += `السبب: ${errorData.message || "خطأ غير معروف"}\n\n`;
-            
-            // استخراج الموديلات المتاحة من استجابة الخطأ
-            if (errorData.models && Array.isArray(errorData.models)) {
-                errorMessage += "💡 الموديلات المتاحة لمفتاحك:\n• " + errorData.models.slice(0, 15).join("\n• ");
-            }
-        } else {
-            errorMessage += `التفاصيل: ${err.message}`;
-        }
-
-        await ctx.reply(errorMessage);
+        console.error(err);
+        await ctx.reply("❌ عيوني، صار خلل بالاتصال. تأكد من الموديل أو حاول مرة ثانية.");
     }
 });
 
 bot.launch();
-console.log("🚀 NAMIKAZE AI Started with Auto-Debug Mode");
+console.log("🚀 NAMIKAZE AI Ready!");
